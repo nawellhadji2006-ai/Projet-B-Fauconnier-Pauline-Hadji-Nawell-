@@ -1,0 +1,209 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+typedef struct {
+    char Identifiant [50];
+    char Nom [50];
+    char Adresse [50];
+    char Ville [50];
+    char Etat [50];
+    int Places_dispo;
+    int Capacite_max;
+    char Date_de_mise_a_jour [50];
+    char Affichage_panneaux [50];
+} parkings ;
+
+typedef struct {
+    char Plaque[10];
+    char Nom[10];
+    char Prenom[10];
+} Client ;
+
+typedef struct {
+    char Plaque[10];
+    float montant_paye;
+    char heure_entree[10];
+    char heure_sortie[10];
+    char id_parking[50];
+} suiviClient ;
+
+void lesparkings(FILE *f, parkings P1[]);
+void afficheparking ( parkings P1[]);
+void afficheparkings (parkings P1[]);
+void sortieParking (suiviClient SC[]);
+void suivi_Client (suiviClient SC[],char Plaque[],float montant_paye,int h1,int m1,int h2,int m2, char id_parking[]);
+int  modeAdministrateur();
+void mettreAJourOccupation(FILE *f, FILE *h, parkings P1[], suiviClient SC[]);
+int verifierPlacesDisponibles (parkings P1[]);
+void sauvegarderEtatParking( parkings P1[], parkings P2[]);
+
+int CODE_SECRET = 46545667;
+
+int main (){
+    FILE *f = fopen("parking-metropole.csv","r");
+    FILE *g = fopen("Client.txt","r");
+    FILE *h = fopen("suiviClient.txt","w+");
+    parkings P1[1000];
+    parkings P2[1000];
+    Client C1[1000];
+    suiviClient SC [1000];
+    if (f == NULL){
+        printf("Erreur ouverture fichier \n");
+    }
+    lesparkings(f, P1);
+    /*for (int i=0;i<10;i++)
+        printf("%s\n",P1[i].Identifiant);*/
+    afficheparking (P1);
+    afficheparkings (P1);
+    sortieParking(SC);
+    mettreAJourOccupation(f, h, P1, SC);
+    modeAdministrateur();
+    verifierPlacesDisponibles(P1);
+    sauvegarderEtatParking(P1,P2);
+    afficheparkings (P2);
+    printf("\n\n");
+    printf("FIN\n");
+    return 0;
+}
+
+
+void lesparkings(FILE *f, parkings P1[]){
+
+    int i = 0;
+    fscanf(f,"%*[^\n]\n"); // Pour passer la premiere ligne qui est le nom de colonnes
+    while (fscanf(f,"%49[^;];%49[^;];%49[^;];%49[^;];%49[^;];%d;%d;%49[^;];%49[^\n]\n",
+                  P1[i].Identifiant,
+                  P1[i].Nom,
+                  P1[i].Adresse,
+                  P1[i].Ville,
+                  P1[i].Etat,
+                  &P1[i].Places_dispo,
+                  &P1[i].Capacite_max,
+                  P1[i].Date_de_mise_a_jour,
+                  P1[i].Affichage_panneaux)== 9){
+            i++;
+    }
+}
+
+void afficheparking ( parkings P1[]){
+    char id[50];
+    printf("Entrer un identifiant\n");
+    scanf("%s", id);
+    for(int i=0; i<27;i++){
+        if (strcmp(id,P1[i].Identifiant) ==0 ){
+            printf("%s %s %s %s %s %d %d %s %s\n\n\n",P1[i].Identifiant,P1[i].Nom,P1[i].Adresse,P1[i].Ville,P1[i].Etat,P1[i].Places_dispo,P1[i].Capacite_max,P1[i].Date_de_mise_a_jour,P1[i].Affichage_panneaux);
+        }
+    }
+}
+
+void afficheparkings (parkings P1[]){
+    for(int i = 0; i<27; i++){
+        printf("%s %s %s %s %s %d %d %s %s\n",P1[i].Identifiant,P1[i].Nom,P1[i].Adresse,P1[i].Ville,P1[i].Etat,P1[i].Places_dispo,P1[i].Capacite_max,P1[i].Date_de_mise_a_jour,P1[i].Affichage_panneaux);
+    }
+    printf("\n\n");
+}
+
+void sortieParking (suiviClient SC[]){
+    char id[50];
+    int h1, m1;
+    int h2, m2;
+    printf("Entrez l'heure d' arrivee (hh mm): ");
+    scanf("%d %d", &h1, &m1);
+
+    printf("Entrez l'heure de depart (hh mm): ");
+    scanf("%d %d", &h2, &m2);
+    int time1_minutes = h1 * 60 + m1;
+    int time2_minutes = h2 * 60 + m2;
+    if (time2_minutes < time1_minutes) {
+            time2_minutes += 24 * 60;
+    }
+    int diff_minutes = time2_minutes - time1_minutes;
+
+
+    char plaque[10];
+    printf("Entrer un identifiant\n");
+    scanf("%s", id);
+    printf("Entrer votre plaque\n");
+    scanf("%s",plaque);
+
+    float prix = diff_minutes*0.03; // Nous avons prit comme convention que les parkings sont à 3 centimes la minutes
+    printf(" Le parking : %s, Plaque d'immatriculation : %s, A payer : %f\n", id, plaque, prix);
+    suivi_Client(SC, plaque, prix, h1, m1, h2, m2, id);
+}
+
+
+void suivi_Client (suiviClient SC[], char Plaque[], float montant_paye,
+                   int h1,int m1,int h2,int m2, char id_parking[]){
+
+    static int i = 0;
+
+    strcpy(SC[i].Plaque, Plaque);
+    SC[i].montant_paye = montant_paye;
+    sprintf(SC[i].heure_entree, "%02d:%02d", h1, m1);
+    sprintf(SC[i].heure_sortie, "%02d:%02d", h2, m2);
+    strcpy(SC[i].id_parking, id_parking);
+
+    i++;
+}
+
+
+void mettreAJourOccupation(FILE *f, FILE *h, parkings P1[], suiviClient SC[]){
+    int n; // Pour savoir le nombre de clients
+    printf("Entrer le nombre de client\n");
+    scanf("%d",&n);
+    for(int i = 0; i<n; i++){
+        for(int j = 0; j<27; j++){
+                /*printf("%s,%s,\n",SC[i].id_parking, P1[j].Identifiant);*/
+            if ((strcmp(SC[i].id_parking, P1[j].Identifiant))==0){
+                P1[j].Places_dispo = P1[j].Places_dispo + 1;
+            }
+        }
+    }
+}
+
+
+int  modeAdministrateur(){
+    int nombre;
+    printf("Entrer le code secret ultra confidentiel\n");
+    scanf("%d", &nombre);
+    if(nombre == CODE_SECRET){
+        printf("Bravo ! Vous etes autorise a modifier les donnees. Statut = Admin\n");
+        return 1;
+    }
+    else{
+        printf("Acces refuse ! Rentre chez ta mere.\n");
+        return 0;
+    }
+}
+
+int verifierPlacesDisponibles (parkings P1[]){
+    char id[50];
+    printf(" Entrer l'identifiant du parking\n");
+    scanf("%s", id);
+    for( int i = 0; i < 27; i++){
+        if(strcmp(P1[i].Identifiant, id)==0){
+            if(P1[i].Places_dispo == 0){
+                printf("Parking plein\n");
+                return 1;
+            }
+            else {
+                printf("Places encore disponibles\n");
+                return 0;}}}
+}
+
+void sauvegarderEtatParking( parkings P1[], parkings P2[]){
+    int i;
+    for(i = 0; i<27; i++){
+        strcpy(P2[i].Identifiant, P1[i].Identifiant);
+        strcpy(P2[i].Nom, P1[i].Nom);
+        strcpy(P2[i].Adresse, P1[i].Adresse);
+        strcpy(P2[i].Ville, P1[i].Ville);
+        strcpy(P2[i].Etat, P1[i].Etat);
+        P2[i].Places_dispo = P1[i].Places_dispo;
+        P2[i].Capacite_max = P1[i].Capacite_max;
+        strcpy(P2[i].Date_de_mise_a_jour, P1[i].Date_de_mise_a_jour);
+        strcpy(P2[i].Affichage_panneaux,P1[i].Affichage_panneaux);
+    }
+}
